@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+
 import requests
 from pprint import pprint
 
@@ -5,120 +8,48 @@ import pandas as pd
 
 import psycopg2
 from psycopg2 import sql
-import models
 
-df = pd.read_csv('sample_hpdata.csv')
-prices = df['Price'].tolist()
 
-# with psycopg2.connect(**models.conn_params) as conn:
-#     with conn.cursor() as cur:
-#         insert_script = sql.SQL("""
-#             INSERT INTO ukprices (price, bedrooms, bathrooms, sqft, location, yearbuilt, lastsolddate)
-#             VALUES (%s, %s, %s, %s, %s, %s, %s)
-#             ON CONFLICT DO NOTHING;
-#         """)
-#
-#         for index,row in df.iterrows():
-#             cur.execute(insert_script, (
-#                 row['Price'],
-#                 row['Bedrooms'],
-#                 row['Bathrooms'],
-#                 row['SqFt'],
-#                 row['Location'],
-#                 row['YearBuilt'],
-#                 row['LastSoldDate']
-#             ))
 
-with psycopg2.connect(**models.conn_params) as conn:
+load_dotenv('.env')
+
+conn_params = {
+    'host': os.getenv('H_NAME'),
+    'dbname': os.getenv('DB_NAME'),
+    'user': os.getenv('UNAME'),
+    'password': os.getenv('PASSWORD'),
+    'port': os.getenv('PORT')
+}
+
+with psycopg2.connect(**conn_params) as conn:
     with conn.cursor() as cur:
-        db_query = """
-            SELECT * FROM ukprices;
-        """
-        cur.execute(db_query)
-        rows = cur.fetchall()
+        # Load data
+        df = pd.read_csv('sample_hpdata.csv')
 
-        all_prices = []
-        for row in rows:
-            all_prices.append(row[1])
-        price_series = pd.Series(all_prices)
-        average_price = price_series.mean()
-        print("Mean Price: ", average_price)
-
-        db_query = """
-            SELECT * FROM ukprices
-            WHERE location IN('London', 'Bristol');
-        """
-        cur.execute(db_query)
-        rows = cur.fetchall()
-        all_prices = []
-        for row in rows:
-            all_prices.append(row[1])
-        price_series = pd.Series(all_prices)
-        avse_price = price_series.mean()
-        print("Mean SE Price: ", avse_price)
-
-        db_query = """
-            SELECT * FROM ukprices
-            WHERE location IN ('Manchester', 'Liverpool', 'Leeds', 'Newcastle', 'Sheffield');
-        """
-        cur.execute(db_query)
-        rows = cur.fetchall()
-        all_prices = []
-        for row in rows:
-            all_prices.append(row[1])
-        price_series = pd.Series(all_prices)
-        avne_price = price_series.mean()
-        print("Mean NE Price: ", avne_price)
-
-        db_query = """
-            SELECT * FROM ukprices
-            WHERE location='Birmingham';
-        """
-        cur.execute(db_query)
-        rows = cur.fetchall()
-        all_prices = []
-        for row in rows:
-            all_prices.append(row[1])
-        price_series = pd.Series(all_prices)
-        avmid_price = price_series.mean()
-        print("Mean Midlands Price: ", avmid_price)
-
-        db_query = """
-            SELECT * FROM ukprices
-            WHERE location IN ('Glasgow', 'Edinburgh');
-        """
-        cur.execute(db_query)
-        rows = cur.fetchall()
-        all_prices = []
-        for row in rows:
-            all_prices.append(row[1])
-        price_series = pd.Series(all_prices)
-        avmid_price = price_series.mean()
-        print("Mean Midlands Price: ", avmid_price)
+        # Ensure data types are correct
+        df['Price'] = pd.to_numeric(df['Price'], errors='coerce')
+        df['Bedrooms'] = pd.to_numeric(df['Bedrooms'], errors='coerce')
+        df['Bathrooms'] = pd.to_numeric(df['Bathrooms'], errors='coerce')
+        df['SqFt'] = pd.to_numeric(df['SqFt'], errors='coerce')
+        df['YearBuilt'] = pd.to_numeric(df['YearBuilt'], errors='coerce')
+        df['LastSoldDate'] = pd.to_datetime(df['LastSoldDate'], errors='coerce')
 
         create_table = """
-            CREATE TABLE IF NOT EXISTS averageprices(
-                id SERIAL PRIMARY KEY,
-                location varchar,
-                avgprice INT
+            CREATE TABLE IF NOT EXISTS ukprices (
+              id SERIAL PRIMARY KEY,
+              price INT,
+              bedrooms INT,
+              bathrooms INT,
+              sqft INT,
+              location VARCHAR,
+              yearbuilt INT,
+              lastsolddate DATE  
             );
         """
         cur.execute(create_table)
 
         insert_script = """
-            INSERT INTO averageprices (location, avgprice)
-            VALUES (%s, %s)
-            ON CONFLICT (location) DO NOTHING;
+            INSERT INTO ukprices (price, bedrooms, bathrooms, sqft, location, yearbuilt, lastsolddate)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT DO NOTHING;
         """
-        insert_values = {
-            'North England': avne_price,
-            'South England': avse_price,
-            'Midlands': avmid_price
-        }
-
-        for region, price in insert_values.items():
-            cur.executemany(insert_script, (region, price))
-
-
-
-
