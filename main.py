@@ -1,55 +1,49 @@
-import os
-from dotenv import load_dotenv
-
-import requests
-from pprint import pprint
-
 import pandas as pd
+import numpy as np
 
-import psycopg2
-from psycopg2 import sql
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import seaborn as sns
+from matplotlib.ticker import FuncFormatter
+
+# Data Formatting
+pd.set_option('display.max_columns', 30)
+
+df = pd.read_csv("Housing.csv")
+df = pd.DataFrame(df)
+
+df['price'] = pd.to_numeric(df['price'])
+df = df.dropna()
+df['airconditioning'] = df['airconditioning'].map({'yes': 1, 'no': 0})
+df['mainroad'] = df['mainroad'].map({'yes': 1, 'no': 0})
+df['guestroom'] = df['guestroom'].map({'yes': 1, 'no': 0})
+df['basement'] = df['basement'].map({'yes': 1, 'no': 0})
+df['hotwaterheating'] = df['hotwaterheating'].map({'yes': 1, 'no': 0})
+df['prefarea'] = df['prefarea'].map({'yes': 1, 'no': 0})
+df['furnishingstatus'] = df['furnishingstatus'].map({'furnished': 2, 'semi-furnished': 1, 'unfurnished': 0})
+
+fdf = df
 
 
+# Plotting
+def plot_chart(data):
+    correlation_matrix = data.corr()
+    plt.figure(figsize=(15, 8))
+    sns.heatmap(correlation_matrix, cmap='coolwarm', annot=True)
+    plt.show()
 
-load_dotenv('.env')
 
-conn_params = {
-    'host': os.getenv('H_NAME'),
-    'dbname': os.getenv('DB_NAME'),
-    'user': os.getenv('UNAME'),
-    'password': os.getenv('PASSWORD'),
-    'port': os.getenv('PORT')
-}
+# Feautre engineering
 
-with psycopg2.connect(**conn_params) as conn:
-    with conn.cursor() as cur:
-        # Load data
-        df = pd.read_csv('sample_hpdata.csv')
-
-        # Ensure data types are correct
-        df['Price'] = pd.to_numeric(df['Price'], errors='coerce')
-        df['Bedrooms'] = pd.to_numeric(df['Bedrooms'], errors='coerce')
-        df['Bathrooms'] = pd.to_numeric(df['Bathrooms'], errors='coerce')
-        df['SqFt'] = pd.to_numeric(df['SqFt'], errors='coerce')
-        df['YearBuilt'] = pd.to_numeric(df['YearBuilt'], errors='coerce')
-        df['LastSoldDate'] = pd.to_datetime(df['LastSoldDate'], errors='coerce')
-
-        create_table = """
-            CREATE TABLE IF NOT EXISTS ukprices (
-              id SERIAL PRIMARY KEY,
-              price INT,
-              bedrooms INT,
-              bathrooms INT,
-              sqft INT,
-              location VARCHAR,
-              yearbuilt INT,
-              lastsolddate DATE  
-            );
-        """
-        cur.execute(create_table)
-
-        insert_script = """
-            INSERT INTO ukprices (price, bedrooms, bathrooms, sqft, location, yearbuilt, lastsolddate)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING;
-        """
+df['price_bathrooms_ratio'] = round(df['price'] / df['bathrooms'], 2)
+df['price_bedrooms_ratio'] = round(df['price'] / df['bedrooms'], 2)
+df['price_stories_ratio'] = round(df['price'] / df['stories'], 2)
+df['total_rooms'] = df['bedrooms'] + df['bathrooms'] + df['guestroom'] + df['basement']
+df['area_parking_ratio'] = round(df['area'] / df['parking'], 2)
+columns_to_drop = ['hotwaterheating']
+df = df.drop(columns_to_drop, axis=1)
+data = df
+# plot_chart(data)
+#
+# print(df)
